@@ -164,7 +164,8 @@ export class RestaurantsCdkStack extends cdk.Stack {
     // Students TODO: Change the table schema as needed
 
     const table = new dynamodb.Table(this, 'Restaurants', {
-      partitionKey: { name: 'SimpleKey', type: dynamodb.AttributeType.STRING },
+      partitionKey: { name: 'resturant_name', type: dynamodb.AttributeType.STRING },
+      
       removalPolicy: cdk.RemovalPolicy.DESTROY,
       billingMode: dynamodb.BillingMode.PROVISIONED,
       readCapacity: 1, // Note for students: you may need to change this num read capacity for scaling testing if you belive that is right

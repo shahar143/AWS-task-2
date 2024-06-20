@@ -1,5 +1,10 @@
 const express = require('express');
+const AWS = require('aws-sdk');
 const RestaurantsMemcachedActions = require('./model/restaurantsMemcachedActions');
+const { DynamoDBClient, PutItemCommand } = require("@aws-sdk/client-dynamodb");
+//const ddb = new DynamoDBClient({ region: process.env.AWS_REGION });
+const docClient = new AWS.DynamoDB.DocumentClient();
+
 
 const app = express();
 app.use(express.json());
@@ -16,16 +21,40 @@ app.get('/', (req, res) => {
         MEMCACHED_CONFIGURATION_ENDPOINT: MEMCACHED_CONFIGURATION_ENDPOINT,
         TABLE_NAME: TABLE_NAME,
         AWS_REGION: AWS_REGION,
-        USE_CACHE: USE_CACHE
     };
     res.send(response);
 });
 
 app.post('/restaurants', async (req, res) => {
-    const restaurant = req.body;
+    const resturant = req.body;
+    try {
+        // Check if restaurant exists in the database
+        const getParams = {
+            TableName: TABLE_NAME,
+            Key: { name: resturant.name }
+        };
+        const { Item } = await docClient.get(getParams).promise(); 
+        if (Item) {
+            return res.status(404).send("resturant already exists");
+        }
 
-    // Students TODO: Implement the logic to add a restaurant
-    res.status(404).send("need to implement");
+        // Add restaurant to the database
+        const putParams = {
+            TableName: TABLE_NAME,
+            Item: {
+                name : resturant.name,
+                region: resturant.region,
+                cuisine: resturant.cuisine,
+                rating: '0' // Initialize with zero rating
+            }
+        };
+        await ddb.send(new PutItemCommand(putParams));
+
+        res.status(200).send({ success: true });
+    } catch (err) {
+        console.log("Error:", err);
+        res.status(500).send("Error adding restaurant");
+    }
 });
 
 app.get('/restaurants/:restaurantName', async (req, res) => {
