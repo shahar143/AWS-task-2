@@ -31,24 +31,24 @@ app.post('/restaurants', async (req, res) => {
         // Check if restaurant exists in the database
         const getParams = {
             TableName: TABLE_NAME,
-            Key: { name: resturant.name }
+            Key: { resturant_name: resturant.name }
         };
         const { Item } = await docClient.get(getParams).promise(); 
         if (Item) {
-            return res.status(404).send("resturant already exists");
+            return res.status(409).send({ success: false , message: 'Restaurant already exists' });
         }
 
         // Add restaurant to the database
         const putParams = {
             TableName: TABLE_NAME,
             Item: {
-                name : resturant.name,
+                resturant_name : resturant.name,
                 region: resturant.region,
                 cuisine: resturant.cuisine,
-                rating: '0' // Initialize with zero rating
+                rating: 0 // Initialize with zero rating
             }
         };
-        await ddb.send(new PutItemCommand(putParams));
+        await docClient.put(putParams).promise();
 
         res.status(200).send({ success: true });
     } catch (err) {
@@ -60,8 +60,15 @@ app.post('/restaurants', async (req, res) => {
 app.get('/restaurants/:restaurantName', async (req, res) => {
     const restaurantName = req.params.restaurantName;
 
-    // Students TODO: Implement the logic to get a restaurant by name
-    res.status(404).send("need to implement");
+    // Check if restaurant exists in the database
+    const getParams = {
+        TableName: TABLE_NAME,
+        Key: { resturant_name: restaurantName }
+    };
+    const { Item } = await docClient.get(getParams).promise(); 
+    if (Item) {
+        return res.status(200).send({ name: restaurantName, cuisine: Item.cuisine, rating: Item.rating, region: Item.region })
+    }
 });
 
 app.delete('/restaurants/:restaurantName', async (req, res) => {
