@@ -81,6 +81,24 @@ app.delete('/restaurants/:restaurantName', async (req, res) => {
 app.post('/restaurants/rating', async (req, res) => {
     const restaurantName = req.body.name;
     const rating = req.body.rating;
+
+    const updateParams = {
+        TableName: TABLE_NAME,
+        Key: { resturant_name: restaurantName },
+        UpdateExpression: 'set rating = :r',
+        ExpressionAttributeValues: { ':r': rating },
+        ReturnValues: "UPDATED_NEW"
+    };
+
+    try {
+        // Attempt to update the rating
+        await docClient.update(updateParams).promise();
+        res.status(200).send({ success: true });
+    } catch (error) {
+        // Handle possible errors, such as the restaurant not being found
+        console.error("Error updating rating:", error);
+        res.status(500).send("Error updating rating");
+    }
     
     // Students TODO: Implement the logic to add a rating to a restaurant
     res.status(404).send("need to implement");
