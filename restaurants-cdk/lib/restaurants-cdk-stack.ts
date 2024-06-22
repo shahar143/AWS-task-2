@@ -161,24 +161,31 @@ export class RestaurantsCdkStack extends cdk.Stack {
   }
 
   private createDynamoDBTable() {
-    // Students TODO: Change the table schema as needed
-
+    // Define the table with a partition key and a sort key if needed
     const table = new dynamodb.Table(this, 'Restaurants', {
-      partitionKey: { name: 'resturant_name', type: dynamodb.AttributeType.STRING },
-      
-      removalPolicy: cdk.RemovalPolicy.DESTROY,
-      billingMode: dynamodb.BillingMode.PROVISIONED,
-      readCapacity: 1, // Note for students: you may need to change this num read capacity for scaling testing if you belive that is right
-      writeCapacity: 1, // Note for students: you may need to change this num write capacity for scaling testing if you belive that is right
+        partitionKey: { name: 'resturant_name', type: dynamodb.AttributeType.STRING },
+        removalPolicy: cdk.RemovalPolicy.DESTROY,
+        billingMode: dynamodb.BillingMode.PROVISIONED,
+        readCapacity: 1,
+        writeCapacity: 1,
+    });
+
+    // Add a global secondary index for 'cuisine'
+    table.addGlobalSecondaryIndex({
+        indexName: 'cuisine-index',
+        partitionKey: { name: 'cuisine', type: dynamodb.AttributeType.STRING },
+        projectionType: dynamodb.ProjectionType.ALL,
+        readCapacity: 1,
+        writeCapacity: 1,
     });
 
     // Output the table name
     new cdk.CfnOutput(this, 'TableName', {
-      value: table.tableName,
+        value: table.tableName,
     });
 
     return table;
-  }
+}
 
   createMemcachedSingleInstaceInPublicSubnetForTestingPurpose(vpc: ec2.IVpc, labRole: iam.IRole) {
     // Note for students: This is dev testing purposes only. you shold not change this code.

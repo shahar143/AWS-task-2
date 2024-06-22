@@ -80,52 +80,178 @@ app.delete('/restaurants/:restaurantName', async (req, res) => {
 
 app.post('/restaurants/rating', async (req, res) => {
     const restaurantName = req.body.name;
-    const rating = req.body.rating;
+    const newRating = req.body.rating;
 
-    const updateParams = {
+    // First, fetch the current restaurant data
+    const getParams = {
         TableName: TABLE_NAME,
-        Key: { resturant_name: restaurantName },
-        UpdateExpression: 'set rating = :r',
-        ExpressionAttributeValues: { ':r': rating },
-        ReturnValues: "UPDATED_NEW"
+        Key: { resturant_name: restaurantName }
     };
 
     try {
-        // Attempt to update the rating
+        const { Item } = await docClient.get(getParams).promise();
+        
+        if (!Item) {
+            return res.status(404).send({ success: false, message: 'Restaurant not found' });
+        }
+
+        // Calculate the new average rating
+        const currentRating = Item.rating || 0;
+        const numRatings = Item.num_ratings || 0;
+        const updatedNumRatings = numRatings + 1;
+        const updatedRating = ((currentRating * numRatings) + newRating) / updatedNumRatings;
+
+        // Update the restaurant with the new rating and increment the number of ratings
+        const updateParams = {
+            TableName: TABLE_NAME,
+            Key: { resturant_name: restaurantName },
+            UpdateExpression: 'set rating = :r, num_ratings = :n',
+            ExpressionAttributeValues: {
+                ':r': updatedRating,
+                ':n': updatedNumRatings
+            },
+            ReturnValues: "UPDATED_NEW"
+        };
+
         await docClient.update(updateParams).promise();
         res.status(200).send({ success: true });
     } catch (error) {
-        // Handle possible errors, such as the restaurant not being found
+        // Handle possible errors
         console.error("Error updating rating:", error);
         res.status(500).send("Error updating rating");
     }
-    
-    // Students TODO: Implement the logic to add a rating to a restaurant
-    res.status(404).send("need to implement");
 });
 
 app.get('/restaurants/cuisine/:cuisine', async (req, res) => {
     const cuisine = req.params.cuisine;
-    let limit = req.query.limit;
-    
-    // Students TODO: Implement the logic to get top rated restaurants by cuisine
-    res.status(404).send("need to implement");
+    let limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;  // Default to 10 if limit is not specified
+    const maxLimit = 100;
+    limit = limit > maxLimit ? maxLimit : limit;  // Cap the limit to maxLimit
+
+    const params = {
+        TableName: TABLE_NAME,
+        IndexName: 'cuisine-index',
+        KeyConditionExpression: 'cuisine = :c',
+        ExpressionAttributeValues: {
+            ':c': cuisine
+        },
+        Limit: limit,
+        ScanIndexForward: false  // To get top rated restaurants, we need to sort by rating in descending order
+    };
+
+    try {
+        const data = await docClient.query(params).promise();
+        
+        if (data.Items) {
+            // Map the response to match the expected format
+            const result = data.Items.map(item => ({
+                name: item.resturant_name,
+                cuisine: item.cuisine,
+                rating: item.rating,
+                region: item.region
+            }));
+            return res.status(200).send(result);
+        } else {
+            return res.status(404).send({ success: false, message: 'No restaurants found for the specified cuisine' });
+        }
+    } catch (error) {
+        console.error("Error fetching restaurants by cuisine:", error);
+        res.status(500).send("Error fetching restaurants by cuisine");
+    }
 });
 
 app.get('/restaurants/region/:region', async (req, res) => {
     const region = req.params.region;
-    let limit = req.query.limit;
-    
-    // Students TODO: Implement the logic to get top rated restaurants by region
-    res.status(404).send("need to implement");
+    let limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;  // Default to 10 if limit is not specified
+    const maxLimit = 100;
+    limit = limit > maxLimit ? maxLimit : limit;  // Cap the limit to maxLimit
+
+    const params = {
+        TableName: TABLE_NAME,
+        FilterExpression: '#r = :r',
+        ExpressionAttributeNames: {
+            '#r': 'region'
+        },
+        ExpressionAttributeValues: {
+            ':r': region
+        }
+    };
+
+    try {
+        const data = await docClient.scan(params).promise();
+
+        if (data.Items) {
+            // Sort the restaurants by rating in descending order
+            const sortedRestaurants = data.Items.sort((a, b) => b.rating - a.rating);
+
+            // If limit is provided, slice the array to the specified limit
+            const limitedRestaurants = limit ? sortedRestaurants.slice(0, limit) : sortedRestaurants;
+
+            // Map the response to match the expected format
+            const result = limitedRestaurants.map(item => ({
+                name: item.resturant_name,
+                cuisine: item.cuisine,
+                rating: item.rating,
+                region: item.region
+            }));
+
+            return res.status(200).send(result);
+        } else {
+            return res.status(404).send({ success: false, message: 'No restaurants found for the specified region' });
+        }
+    } catch (error) {
+        console.error("Error fetching restaurants by region:", error);
+        res.status(500).send("Error fetching restaurants by region");
+    }
 });
+
 
 app.get('/restaurants/region/:region/cuisine/:cuisine', async (req, res) => {
     const region = req.params.region;
     const cuisine = req.params.cuisine;
+    let limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;  // Default to 10 if limit is not specified
+    const maxLimit = 100;
+    limit = limit > maxLimit ? maxLimit : limit;  // Cap the limit to maxLimit
 
-    // Students TODO: Implement the logic to get top rated restaurants by region and cuisine
-    res.status(404).send("need to implement");
+    const params = {
+        TableName: TABLE_NAME,
+        FilterExpression: '#r = :r and #c = :c',
+        ExpressionAttributeNames: {
+            '#r': 'region',
+            '#c': 'cuisine'
+        },
+        ExpressionAttributeValues: {
+            ':r': region,
+            ':c': cuisine
+        }
+    };
+
+    try {
+        const data = await docClient.scan(params).promise();
+
+        if (data.Items) {
+            // Sort the restaurants by rating in descending order
+            const sortedRestaurants = data.Items.sort((a, b) => b.rating - a.rating);
+
+            // If limit is provided, slice the array to the specified limit
+            const limitedRestaurants = limit ? sortedRestaurants.slice(0, limit) : sortedRestaurants;
+
+            // Map the response to match the expected format
+            const result = limitedRestaurants.map(item => ({
+                name: item.resturant_name,
+                cuisine: item.cuisine,
+                rating: item.rating,
+                region: item.region
+            }));
+
+            return res.status(200).send(result);
+        } else {
+            return res.status(404).send({ success: false, message: 'No restaurants found for the specified region and cuisine' });
+        }
+    } catch (error) {
+        console.error("Error fetching restaurants by region and cuisine:", error);
+        res.status(500).send("Error fetching restaurants by region and cuisine");
+    }
 });
 
 app.listen(80, () => {
