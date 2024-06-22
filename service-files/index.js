@@ -60,23 +60,56 @@ app.post('/restaurants', async (req, res) => {
 app.get('/restaurants/:restaurantName', async (req, res) => {
     const restaurantName = req.params.restaurantName;
 
-    // Check if restaurant exists in the database
     const getParams = {
         TableName: TABLE_NAME,
         Key: { resturant_name: restaurantName }
     };
-    const { Item } = await docClient.get(getParams).promise(); 
-    if (Item) {
-        return res.status(200).send({ name: restaurantName, cuisine: Item.cuisine, rating: Item.rating, region: Item.region })
+
+    try {
+        const { Item } = await docClient.get(getParams).promise();
+
+        if (Item) {
+            return res.status(200).send({
+                name: restaurantName,
+                cuisine: Item.cuisine,
+                rating: Item.rating,
+                region: Item.region
+            });
+        } else {
+            return res.status(404).send("Restaurant not found");
+        }
+    } catch (error) {
+        console.error("Error fetching restaurant:", error);
+        return res.status(500).send("Error fetching restaurant");
     }
 });
 
+
 app.delete('/restaurants/:restaurantName', async (req, res) => {
     const restaurantName = req.params.restaurantName;
-    
-    // Students TODO: Implement the logic to delete a restaurant by name
-    res.status(404).send("need to implement");
+
+    const deleteParams = {
+        TableName: TABLE_NAME,
+        Key: { resturant_name: restaurantName }
+    };
+
+    try {
+        // Check if the restaurant exists
+        const { Item } = await docClient.get({ TableName: TABLE_NAME, Key: { resturant_name: restaurantName } }).promise();
+        if (!Item) {
+            return res.status(404).send({ success: false, message: 'Restaurant not found' });
+        }
+
+        // Delete the restaurant
+        await docClient.delete(deleteParams).promise();
+
+        return res.status(200).send({ success: true });
+    } catch (error) {
+        console.error("Error deleting restaurant:", error);
+        return res.status(500).send("Error deleting restaurant");
+    }
 });
+
 
 app.post('/restaurants/rating', async (req, res) => {
     const restaurantName = req.body.name;
