@@ -26,12 +26,13 @@ app.get('/', (req, res) => {
 });
 
 app.post('/restaurants', async (req, res) => {
-    const resturant = req.body;
+    const restaurant = req.body;
+    const cacheKey = `restaurant_${restaurant.name}`;
     try {
         // Check if restaurant exists in the database
         const getParams = {
             TableName: TABLE_NAME,
-            Key: { resturant_name: resturant.name }
+            Key: { resturant_name: restaurant.name }
         };
         const { Item } = await docClient.get(getParams).promise(); 
         if (Item) {
@@ -42,13 +43,21 @@ app.post('/restaurants', async (req, res) => {
         const putParams = {
             TableName: TABLE_NAME,
             Item: {
-                resturant_name : resturant.name,
-                region: resturant.region,
-                cuisine: resturant.cuisine,
+                resturant_name : restaurant.name,
+                region: restaurant.region,
+                cuisine: restaurant.cuisine,
                 rating: 0 // Initialize with zero rating
             }
         };
         await docClient.put(putParams).promise();
+
+        // Update cache with new restaurant data
+        await memcachedActions.addRestaurants(cacheKey, {
+            name: restaurant.name,
+            cuisine: restaurant.cuisine,
+            rating: 0,
+            region: restaurant.region
+        });
 
         res.status(200).send({ success: true });
     } catch (err) {
@@ -57,24 +66,38 @@ app.post('/restaurants', async (req, res) => {
     }
 });
 
+
 app.get('/restaurants/:restaurantName', async (req, res) => {
     const restaurantName = req.params.restaurantName;
-
-    const getParams = {
-        TableName: TABLE_NAME,
-        Key: { resturant_name: restaurantName }
-    };
+    const cacheKey = `restaurant_${restaurantName}`;
 
     try {
+        // Check if restaurant data is in cache
+        const cachedData = await memcachedActions.getRestaurants(cacheKey);
+        if (cachedData) {
+            return res.status(200).send(cachedData);
+        }
+
+        // If not in cache, retrieve from DynamoDB
+        const getParams = {
+            TableName: TABLE_NAME,
+            Key: { resturant_name: restaurantName }
+        };
+
         const { Item } = await docClient.get(getParams).promise();
 
         if (Item) {
-            return res.status(200).send({
+            const restaurantData = {
                 name: restaurantName,
                 cuisine: Item.cuisine,
                 rating: Item.rating,
                 region: Item.region
-            });
+            };
+            
+            // Store retrieved data in cache
+            await memcachedActions.addRestaurants(cacheKey, restaurantData);
+
+            return res.status(200).send(restaurantData);
         } else {
             return res.status(404).send("Restaurant not found");
         }
@@ -85,8 +108,10 @@ app.get('/restaurants/:restaurantName', async (req, res) => {
 });
 
 
+
 app.delete('/restaurants/:restaurantName', async (req, res) => {
     const restaurantName = req.params.restaurantName;
+    const cacheKey = `restaurant_${restaurantName}`;
 
     const deleteParams = {
         TableName: TABLE_NAME,
@@ -100,8 +125,11 @@ app.delete('/restaurants/:restaurantName', async (req, res) => {
             return res.status(404).send({ success: false, message: 'Restaurant not found' });
         }
 
-        // Delete the restaurant
+        // Delete the restaurant from DynamoDB
         await docClient.delete(deleteParams).promise();
+
+        // Remove the restaurant from the cache
+        await memcachedActions.deleteRestaurants(cacheKey);
 
         return res.status(200).send({ success: true });
     } catch (error) {
@@ -111,9 +139,11 @@ app.delete('/restaurants/:restaurantName', async (req, res) => {
 });
 
 
+
 app.post('/restaurants/rating', async (req, res) => {
     const restaurantName = req.body.name;
     const newRating = req.body.rating;
+    const cacheKey = `restaurant_${restaurantName}`;
 
     // First, fetch the current restaurant data
     const getParams = {
@@ -147,13 +177,23 @@ app.post('/restaurants/rating', async (req, res) => {
         };
 
         await docClient.update(updateParams).promise();
+
+        // Update the cache with the new rating
+        const updatedRestaurantData = {
+            name: restaurantName,
+            cuisine: Item.cuisine,
+            rating: updatedRating,
+            region: Item.region
+        };
+        await memcachedActions.addRestaurants(cacheKey, updatedRestaurantData);
+
         res.status(200).send({ success: true });
     } catch (error) {
-        // Handle possible errors
         console.error("Error updating rating:", error);
         res.status(500).send("Error updating rating");
     }
 });
+
 
 app.get('/restaurants/cuisine/:cuisine', async (req, res) => {
     const cuisine = req.params.cuisine;

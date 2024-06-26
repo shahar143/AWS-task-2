@@ -24,9 +24,9 @@ export class RestaurantsCdkStack extends cdk.Stack {
 
     this.createNatGatewayForPrivateSubnet(vpc);
 
-    const memcachedConfigurationEndpoint = this.createMemcachedSingleInstaceInPublicSubnetForTestingPurpose(vpc, labRole);
+    //const memcachedConfigurationEndpoint = this.createMemcachedSingleInstaceInPublicSubnetForTestingPurpose(vpc, labRole);
     // Students TODO: Comment out the above line and uncomment the below line to use Elasticache, for the testing phase
-    // const memcachedConfigurationEndpoint = this.createMemcachedElasticache(vpc, labRole);
+    const memcachedConfigurationEndpoint = this.createMemcachedElasticache(vpc, labRole);
 
     const table = this.createDynamoDBTable();
 
@@ -107,7 +107,7 @@ export class RestaurantsCdkStack extends cdk.Stack {
       vpcSubnets: { subnetType: ec2.SubnetType.PRIVATE_WITH_EGRESS },
       role: labRole,
       minCapacity: 1, // Note for students: you may need to change this min capacity for scaling testing if you belive that is right
-      maxCapacity: 1, // Note for students: you may need to change this max capacity for scaling testing if you belive that is right
+      maxCapacity: 3, // Note for students: you may need to change this max capacity for scaling testing if you belive that is right
       desiredCapacity: 1, // Note for students: you may need to change this desired capacity for scaling testing if you belive that is right
     });
 
@@ -254,7 +254,7 @@ export class RestaurantsCdkStack extends cdk.Stack {
       cacheSubnetGroupName: privateSubnetGroup.ref,
       cacheNodeType: 'cache.t2.micro',
       engine: 'memcached',
-      numCacheNodes: 1, // Note for students: you may need to change this num cache nodes for scaling testing if you belive that is right
+      numCacheNodes: 2, // Note for students: you may need to change this num cache nodes for scaling testing if you belive that is right
       vpcSecurityGroupIds: [memcachedSecurityGroup.securityGroupId],
     });
 
