@@ -52,12 +52,18 @@ app.post('/restaurants', async (req, res) => {
         await docClient.put(putParams).promise();
 
         // Update cache with new restaurant data
-        await memcachedActions.addRestaurants(cacheKey, {
-            name: restaurant.name,
-            cuisine: restaurant.cuisine,
-            rating: 0,
-            region: restaurant.region
-        });
+        if (USE_CACHE){
+            const cachedData = await memcachedActions.getRestaurants(cacheKey);
+            if (!cachedData) {
+                const resturant = {
+                    name: restaurant.name,
+                    cuisine: restaurant.cuisine,
+                    rating: 0,
+                    region: restaurant.region
+                }
+                await memcachedActions.addRestaurants(cacheKey, resturant); 
+            }
+        }
 
         res.status(200).send({ success: true });
     } catch (err) {
@@ -73,9 +79,11 @@ app.get('/restaurants/:restaurantName', async (req, res) => {
 
     try {
         // Check if restaurant data is in cache
-        const cachedData = await memcachedActions.getRestaurants(cacheKey);
-        if (cachedData) {
-            return res.status(200).send(cachedData);
+        if (USE_CACHE){
+            const cachedData = await memcachedActions.getRestaurants(cacheKey);
+            if (cachedData) {
+                return res.status(200).send(cachedData);
+            }
         }
 
         // If not in cache, retrieve from DynamoDB
@@ -94,9 +102,14 @@ app.get('/restaurants/:restaurantName', async (req, res) => {
                 region: Item.region
             };
             
-            // Store retrieved data in cache
-            await memcachedActions.addRestaurants(cacheKey, restaurantData);
+            if (USE_CACHE){
+                // Store retrieved data in cache
+                await memcachedActions.addRestaurants(cacheKey, restaurantData);
+            }
 
+            //match resturantData to return formant
+
+            console.log(restaurantData);
             return res.status(200).send(restaurantData);
         } else {
             return res.status(404).send("Restaurant not found");
@@ -106,7 +119,6 @@ app.get('/restaurants/:restaurantName', async (req, res) => {
         return res.status(500).send("Error fetching restaurant");
     }
 });
-
 
 
 app.delete('/restaurants/:restaurantName', async (req, res) => {
@@ -128,8 +140,13 @@ app.delete('/restaurants/:restaurantName', async (req, res) => {
         // Delete the restaurant from DynamoDB
         await docClient.delete(deleteParams).promise();
 
-        // Remove the restaurant from the cache
-        await memcachedActions.deleteRestaurants(cacheKey);
+        if (USE_CACHE){
+            // Remove the restaurant from the cache
+            const cachedData = await memcachedActions.getRestaurants(cacheKey);
+            if (cachedData) {
+                await memcachedActions.deleteRestaurants(cacheKey);
+            }
+        }
 
         return res.status(200).send({ success: true });
     } catch (error) {
@@ -178,14 +195,20 @@ app.post('/restaurants/rating', async (req, res) => {
 
         await docClient.update(updateParams).promise();
 
-        // Update the cache with the new rating
-        const updatedRestaurantData = {
-            name: restaurantName,
-            cuisine: Item.cuisine,
-            rating: updatedRating,
-            region: Item.region
-        };
-        await memcachedActions.addRestaurants(cacheKey, updatedRestaurantData);
+        if (USE_CACHE){
+            const cachedData = await memcachedActions.getRestaurants(cacheKey);
+            if (cachedData) {
+                await memcachedActions.deleteRestaurants(cacheKey);
+                // Update the cache with the new rating
+                const updatedRestaurantData = {
+                    name: restaurantName,
+                    cuisine: Item.cuisine,
+                    rating: updatedRating,
+                    region: Item.region
+                };
+                await memcachedActions.addRestaurants(cacheKey, updatedRestaurantData);
+            }
+        }
 
         res.status(200).send({ success: true });
     } catch (error) {
@@ -200,6 +223,7 @@ app.get('/restaurants/cuisine/:cuisine', async (req, res) => {
     let limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;  // Default to 10 if limit is not specified
     const maxLimit = 100;
     limit = limit > maxLimit ? maxLimit : limit;  // Cap the limit to maxLimit
+    cacheKey = 'cuisine_${cuisine}_limit_${limit}'
 
     const params = {
         TableName: TABLE_NAME,
@@ -213,6 +237,12 @@ app.get('/restaurants/cuisine/:cuisine', async (req, res) => {
     };
 
     try {
+        if(USE_CACHE){
+            const cachedData = await memcachedActions.getRestaurants(cacheKey);
+            if (cachedData) {
+                return res.status(200).send(cachedData);
+            }
+        }
         const data = await docClient.query(params).promise();
         
         if (data.Items) {
@@ -223,6 +253,11 @@ app.get('/restaurants/cuisine/:cuisine', async (req, res) => {
                 rating: item.rating,
                 region: item.region
             }));
+
+            if (USE_CACHE){ 
+                // Store the result in cache
+                await memcachedActions.addRestaurants(cacheKey, result);
+            }
             return res.status(200).send(result);
         } else {
             return res.status(404).send({ success: false, message: 'No restaurants found for the specified cuisine' });
@@ -238,6 +273,7 @@ app.get('/restaurants/region/:region', async (req, res) => {
     let limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;  // Default to 10 if limit is not specified
     const maxLimit = 100;
     limit = limit > maxLimit ? maxLimit : limit;  // Cap the limit to maxLimit
+    cacheKey = 'region_${region}_limit_${limit}'
 
     const params = {
         TableName: TABLE_NAME,
@@ -251,6 +287,12 @@ app.get('/restaurants/region/:region', async (req, res) => {
     };
 
     try {
+        if (USE_CACHE){
+            const cachedData = await memcachedActions.getRestaurants(cacheKey);
+            if (cachedData) {
+                return res.status(200).send(cachedData);
+            }
+        }
         const data = await docClient.scan(params).promise();
 
         if (data.Items) {
@@ -267,6 +309,11 @@ app.get('/restaurants/region/:region', async (req, res) => {
                 rating: item.rating,
                 region: item.region
             }));
+
+            if (USE_CACHE){
+                // Store the result in cache
+                await memcachedActions.addRestaurants(cacheKey, result);
+            }
 
             return res.status(200).send(result);
         } else {
@@ -285,6 +332,7 @@ app.get('/restaurants/region/:region/cuisine/:cuisine', async (req, res) => {
     let limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;  // Default to 10 if limit is not specified
     const maxLimit = 100;
     limit = limit > maxLimit ? maxLimit : limit;  // Cap the limit to maxLimit
+    cacheKey = 'region_${region}_cuisine_${cuisine}_limit_${limit}'
 
     const params = {
         TableName: TABLE_NAME,
@@ -300,6 +348,13 @@ app.get('/restaurants/region/:region/cuisine/:cuisine', async (req, res) => {
     };
 
     try {
+        if (USE_CACHE){
+            const cachedData = await memcachedActions.getRestaurants(cacheKey);
+            if (cachedData) {
+                return res.status(200).send(cachedData);
+            }
+        }
+
         const data = await docClient.scan(params).promise();
 
         if (data.Items) {
@@ -316,6 +371,11 @@ app.get('/restaurants/region/:region/cuisine/:cuisine', async (req, res) => {
                 rating: item.rating,
                 region: item.region
             }));
+
+            if (USE_CACHE){
+                // Store the result in cache
+                await memcachedActions.addRestaurants(cacheKey, result);
+            }
 
             return res.status(200).send(result);
         } else {
