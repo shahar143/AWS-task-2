@@ -25,6 +25,16 @@ app.get('/', (req, res) => {
     res.send(response);
 });
 
+app.put('/cache', (req, res) => {
+    const { useCache } = req.body;
+    if (typeof useCache !== 'boolean') {
+        return res.status(400).send({ success: false, message: 'useCache must be a boolean' });
+    }
+    USE_CACHE = useCache;
+    console.log(`Cache usage set to: ${USE_CACHE}`);
+    res.send({ success: true, USE_CACHE: USE_CACHE });
+});
+
 app.post('/restaurants', async (req, res) => {
     const restaurant = req.body;
     const cacheKey = `restaurant_${restaurant.name}`;
