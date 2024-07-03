@@ -15,6 +15,7 @@
     "aws-sdk": "^2.1645.0",
     "axios": "^1.7.2",
     "express": "^4.19.2",
+    "http": "^0.0.1-security",
     "memcache-client": "^1.0.5"
   },
   "devDependencies": {
