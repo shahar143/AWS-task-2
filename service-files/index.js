@@ -5,7 +5,6 @@ const { DynamoDBClient, PutItemCommand } = require("@aws-sdk/client-dynamodb");
 //const ddb = new DynamoDBClient({ region: process.env.AWS_REGION });
 const docClient = new AWS.DynamoDB.DocumentClient();
 
-
 const app = express();
 app.use(express.json());
 
@@ -16,6 +15,9 @@ const USE_CACHE = process.env.USE_CACHE === 'true';
 
 const memcachedActions = new RestaurantsMemcachedActions(MEMCACHED_CONFIGURATION_ENDPOINT);
 
+/**
+ * Endpoint to retrieve configuration details.
+ */
 app.get('/', (req, res) => {
     const response = {
         MEMCACHED_CONFIGURATION_ENDPOINT: MEMCACHED_CONFIGURATION_ENDPOINT,
@@ -25,6 +27,9 @@ app.get('/', (req, res) => {
     res.send(response);
 });
 
+/**
+ * Endpoint to enable or disable cache usage.
+ */
 app.put('/cache', (req, res) => {
     const { useCache } = req.body;
     if (typeof useCache !== 'boolean') {
@@ -32,9 +37,12 @@ app.put('/cache', (req, res) => {
     }
     USE_CACHE = useCache;
     console.log(`Cache usage set to: ${USE_CACHE}`);
-    res.send({ success: true, USE_CACHE: USE_CACHE });
+    res.status(200).send({ success: true, USE_CACHE: USE_CACHE });
 });
 
+/**
+ * Endpoint to create a new restaurant record.
+ */
 app.post('/restaurants', async (req, res) => {
     const restaurant = req.body;
     const cacheKey = `restaurant_${restaurant.name}`;
@@ -82,7 +90,9 @@ app.post('/restaurants', async (req, res) => {
     }
 });
 
-
+/**
+ * Endpoint to retrieve details of a restaurant by its name.
+ */
 app.get('/restaurants/:restaurantName', async (req, res) => {
     const restaurantName = req.params.restaurantName;
     const cacheKey = `restaurant_${restaurantName}`;
@@ -130,7 +140,9 @@ app.get('/restaurants/:restaurantName', async (req, res) => {
     }
 });
 
-
+/**
+ * Endpoint to delete a restaurant by its name.
+ */
 app.delete('/restaurants/:restaurantName', async (req, res) => {
     const restaurantName = req.params.restaurantName;
     const cacheKey = `restaurant_${restaurantName}`;
@@ -165,8 +177,9 @@ app.delete('/restaurants/:restaurantName', async (req, res) => {
     }
 });
 
-
-
+/**
+ * Endpoint to update the rating of a restaurant.
+ */
 app.post('/restaurants/rating', async (req, res) => {
     const restaurantName = req.body.name;
     const newRating = req.body.rating;
@@ -227,13 +240,16 @@ app.post('/restaurants/rating', async (req, res) => {
     }
 });
 
-
+/**
+ * Endpoint to retrieve top-rated restaurants by cuisine with optional minimum rating and limit.
+ */
 app.get('/restaurants/cuisine/:cuisine', async (req, res) => {
     const cuisine = req.params.cuisine;
     let limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;  // Default to 10 if limit is not specified
     const maxLimit = 100;
     limit = limit > maxLimit ? maxLimit : limit;  // Cap the limit to maxLimit
-    cacheKey = 'cuisine_${cuisine}_limit_${limit}'
+    const minRating = req.query.minRating ? parseFloat(req.query.minRating) : 0;  // Default to 0 if minRating is not specified
+    const cacheKey = `cuisine_${cuisine}_limit_${limit}_minRating_${minRating}`;
 
     const params = {
         TableName: TABLE_NAME,
@@ -253,21 +269,26 @@ app.get('/restaurants/cuisine/:cuisine', async (req, res) => {
                 return res.status(200).send(cachedData);
             }
         }
+
         const data = await docClient.query(params).promise();
         
         if (data.Items) {
+            // Filter by minimum rating
+            const filteredItems = data.Items.filter(item => item.rating >= minRating);
+
             // Map the response to match the expected format
-            const result = data.Items.map(item => ({
+            const result = filteredItems.map(item => ({
                 name: item.resturant_name,
                 cuisine: item.cuisine,
                 rating: item.rating,
                 region: item.region
             }));
 
-            if (USE_CACHE){ 
+            if (USE_CACHE) { 
                 // Store the result in cache
                 await memcachedActions.addRestaurants(cacheKey, result);
             }
+
             return res.status(200).send(result);
         } else {
             return res.status(404).send({ success: false, message: 'No restaurants found for the specified cuisine' });
@@ -278,12 +299,15 @@ app.get('/restaurants/cuisine/:cuisine', async (req, res) => {
     }
 });
 
+/**
+ * Endpoint to retrieve top-rated restaurants by region with optional limit.
+ */
 app.get('/restaurants/region/:region', async (req, res) => {
     const region = req.params.region;
     let limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;  // Default to 10 if limit is not specified
     const maxLimit = 100;
     limit = limit > maxLimit ? maxLimit : limit;  // Cap the limit to maxLimit
-    cacheKey = 'region_${region}_limit_${limit}'
+    cacheKey = `region_${region}_limit_${limit}`;
 
     const params = {
         TableName: TABLE_NAME,
@@ -335,14 +359,16 @@ app.get('/restaurants/region/:region', async (req, res) => {
     }
 });
 
-
+/**
+ * Endpoint to retrieve top-rated restaurants by region and cuisine with optional limit.
+ */
 app.get('/restaurants/region/:region/cuisine/:cuisine', async (req, res) => {
     const region = req.params.region;
     const cuisine = req.params.cuisine;
     let limit = req.query.limit ? parseInt(req.query.limit, 10) : 10;  // Default to 10 if limit is not specified
     const maxLimit = 100;
     limit = limit > maxLimit ? maxLimit : limit;  // Cap the limit to maxLimit
-    cacheKey = 'region_${region}_cuisine_${cuisine}_limit_${limit}'
+    cacheKey = `region_${region}_cuisine_${cuisine}_limit_${limit}`;
 
     const params = {
         TableName: TABLE_NAME,

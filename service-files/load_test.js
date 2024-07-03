@@ -10,6 +10,9 @@ const sleep = (ms) => {
     return new Promise(resolve => setTimeout(resolve, ms));
 };
 
+/**
+ * Makes an HTTP request and returns the response.
+ */
 const makeRequest = (options, postData = null) => {
     return new Promise((resolve, reject) => {
         const req = http.request(options, (res) => {
@@ -34,6 +37,9 @@ const makeRequest = (options, postData = null) => {
     });
 };
 
+/**
+ * Inserts multiple restaurant records.
+ */
 const insertRestaurants = async () => {
     const restaurants = [
         { name: 'Restaurant1', cuisine: 'Italian', rating: 4.5, region: 'North' },
@@ -73,6 +79,9 @@ const insertRestaurants = async () => {
     }
 };
 
+/**
+ * Updates the ratings of multiple restaurant records.
+ */
 const updateRestaurantRatings = async () => {
     const ratings = [
         { name: 'Restaurant1', rating: 4.5 },
@@ -112,6 +121,9 @@ const updateRestaurantRatings = async () => {
     }
 };
 
+/**
+ * Deletes multiple restaurant records.
+ */
 const deleteRestaurants = async () => {
     const restaurantNames = [
         'Restaurant1',
@@ -151,6 +163,9 @@ const deleteRestaurants = async () => {
     }
 };
 
+/**
+ * Retrieves details of a restaurant by its name.
+ */
 const getRestaurantByName = async (name) => {
     const start = performance.now();
     const options = {
@@ -171,6 +186,9 @@ const getRestaurantByName = async (name) => {
     return timeTaken;
 };
 
+/**
+ * Retrieves top-rated restaurants by region.
+ */
 const getTopRatedRestaurantsByRegion = async (region) => {
     const start = performance.now();
     const options = {
@@ -191,6 +209,9 @@ const getTopRatedRestaurantsByRegion = async (region) => {
     return timeTaken;
 };
 
+/**
+ * Retrieves top-rated restaurants by cuisine.
+ */
 const getTopRatedRestaurantsByCuisine = async (cuisine, limit = 10) => {
     const start = performance.now();
     const options = {
@@ -211,6 +232,9 @@ const getTopRatedRestaurantsByCuisine = async (cuisine, limit = 10) => {
     return timeTaken;
 };
 
+/**
+ * Retrieves top-rated restaurants by region and cuisine.
+ */
 const getTopRatedRestaurantsByRegionAndCuisine = async (region, cuisine, limit = 10) => {
     const start = performance.now();
     const options = {
@@ -227,10 +251,34 @@ const getTopRatedRestaurantsByRegionAndCuisine = async (region, cuisine, limit =
     const end = performance.now();
     const timeTaken = end - start;
     console.log(`Fetched top-rated restaurants by region (${region}) and cuisine (${cuisine}): Status Code: ${response.statusCode}, Time taken: ${timeTaken.toFixed(2)} ms`);
-
     return timeTaken;
 };
 
+/**
+ * Retrieves top-rated restaurants by cuisine with a minimum rating.
+ */
+const getTopRatedRestaurantsByCuisineWithMinRating = async (cuisine, minRating, limit = 10) => {
+    const start = performance.now();
+    const options = {
+        hostname: endPoint,
+        port: port,
+        path: `/restaurants/cuisine/${cuisine}?minRating=${minRating}&limit=${limit}`,
+        method: 'GET',
+        headers: {
+            'Content-Type': 'application/json'
+        }
+    };
+
+    const response = await makeRequest(options);
+    const end = performance.now();
+    const timeTaken = end - start;
+    console.log(`Fetched top-rated restaurants by cuisine (${cuisine}) with minRating (${minRating}): Status Code: ${response.statusCode}, Time taken: ${timeTaken.toFixed(2)} ms`);
+    return timeTaken;
+};
+
+/**
+ * Sets the cache usage setting.
+ */
 const setCacheUsage = async (useCache) => {
     const options = {
         hostname: endPoint,
@@ -250,6 +298,9 @@ const setCacheUsage = async (useCache) => {
     }
 };
 
+/**
+ * Runs the load test with specified cache usage.
+ */
 const runLoadTest = async (useCache) => {
     await setCacheUsage(useCache);
 
@@ -258,23 +309,26 @@ const runLoadTest = async (useCache) => {
         getRestaurantByName: [],
         getTopRatedRestaurantsByRegion: [],
         getTopRatedRestaurantsByCuisine: [],
-        getTopRatedRestaurantsByRegionAndCuisine: []
+        getTopRatedRestaurantsByRegionAndCuisine: [],
+        getTopRatedRestaurantsByCuisineWithMinRating: []
     };
 
     const restaurantNames = ['Restaurant1', 'Restaurant2', 'Restaurant3', 'Restaurant4', 'Restaurant5'];
     const regions = ['North', 'South', 'East', 'West', 'Central'];
     const cuisines = ['Italian', 'Chinese', 'Mexican', 'Indian', 'Thai'];
 
-    for (let i = 0; i < 200; i++) {
+    for (let i = 0; i < 100; i++) {
         const randomRestaurant = restaurantNames[Math.floor(Math.random() * restaurantNames.length)];
         const randomRegion = regions[Math.floor(Math.random() * regions.length)];
         const randomCuisine = cuisines[Math.floor(Math.random() * cuisines.length)];
+        const randomMinRating = (Math.random() * 4).toFixed(1);  // Random rating between 0.0 and 4.0
 
         tasks.push(async () => {
             times.getRestaurantByName.push(await getRestaurantByName(randomRestaurant));
             times.getTopRatedRestaurantsByRegion.push(await getTopRatedRestaurantsByRegion(randomRegion));
             times.getTopRatedRestaurantsByCuisine.push(await getTopRatedRestaurantsByCuisine(randomCuisine));
             times.getTopRatedRestaurantsByRegionAndCuisine.push(await getTopRatedRestaurantsByRegionAndCuisine(randomRegion, randomCuisine));
+            times.getTopRatedRestaurantsByCuisineWithMinRating.push(await getTopRatedRestaurantsByCuisineWithMinRating(randomCuisine, randomMinRating));
         });
     }
 
@@ -283,6 +337,9 @@ const runLoadTest = async (useCache) => {
     return times;
 };
 
+/**
+ * Main function to run the load test.
+ */
 const loadTest = async () => {
     await insertRestaurants();
     await sleep(5000); // Sleep for 5 seconds to allow cache to update
@@ -303,13 +360,15 @@ const loadTest = async () => {
             getRestaurantByName: averageTime(timesWithCache.getRestaurantByName).toFixed(2),
             getTopRatedRestaurantsByRegion: averageTime(timesWithCache.getTopRatedRestaurantsByRegion).toFixed(2),
             getTopRatedRestaurantsByCuisine: averageTime(timesWithCache.getTopRatedRestaurantsByCuisine).toFixed(2),
-            getTopRatedRestaurantsByRegionAndCuisine: averageTime(timesWithCache.getTopRatedRestaurantsByRegionAndCuisine).toFixed(2)
+            getTopRatedRestaurantsByRegionAndCuisine: averageTime(timesWithCache.getTopRatedRestaurantsByRegionAndCuisine).toFixed(2),
+            getTopRatedRestaurantsByCuisineWithMinRating: averageTime(timesWithCache.getTopRatedRestaurantsByCuisineWithMinRating).toFixed(2)
         },
         withoutCache: {
             getRestaurantByName: averageTime(timesWithoutCache.getRestaurantByName).toFixed(2),
             getTopRatedRestaurantsByRegion: averageTime(timesWithoutCache.getTopRatedRestaurantsByRegion).toFixed(2),
             getTopRatedRestaurantsByCuisine: averageTime(timesWithoutCache.getTopRatedRestaurantsByCuisine).toFixed(2),
-            getTopRatedRestaurantsByRegionAndCuisine: averageTime(timesWithoutCache.getTopRatedRestaurantsByRegionAndCuisine).toFixed(2)
+            getTopRatedRestaurantsByRegionAndCuisine: averageTime(timesWithoutCache.getTopRatedRestaurantsByRegionAndCuisine).toFixed(2),
+            getTopRatedRestaurantsByCuisineWithMinRating: averageTime(timesWithoutCache.getTopRatedRestaurantsByCuisineWithMinRating).toFixed(2)
         }
     };
 
