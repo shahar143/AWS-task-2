@@ -1,0 +1,14 @@
+{
+  "withCache": {
+    "getRestaurantByName": "91.58",
+    "getTopRatedRestaurantsByRegion": "89.56",
+    "getTopRatedRestaurantsByCuisine": "90.69",
+    "getTopRatedRestaurantsByRegionAndCuisine": "90.59"
+  },
+  "withoutCache": {
+    "getRestaurantByName": "89.09",
+    "getTopRatedRestaurantsByRegion": "89.20",
+    "getTopRatedRestaurantsByCuisine": "89.08",
+    "getTopRatedRestaurantsByRegionAndCuisine": "89.44"
+  }
+}
