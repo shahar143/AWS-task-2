@@ -28,19 +28,6 @@ app.get('/', (req, res) => {
 });
 
 /**
- * Endpoint to enable or disable cache usage.
- */
-app.put('/cache', (req, res) => {
-    const { useCache } = req.body;
-    if (typeof useCache !== 'boolean') {
-        return res.status(400).send({ success: false, message: 'useCache must be a boolean' });
-    }
-    USE_CACHE = useCache;
-    console.log(`Cache usage set to: ${USE_CACHE}`);
-    res.status(200).send({ success: true, USE_CACHE: USE_CACHE });
-});
-
-/**
  * Endpoint to create a new restaurant record.
  */
 app.post('/restaurants', async (req, res) => {

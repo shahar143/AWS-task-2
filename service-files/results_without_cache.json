@@ -1,0 +1,10 @@
+{
+  "totalTime": "11.38",
+  "timePerFunction": {
+    "getRestaurantByName": "91.51",
+    "getTopRatedRestaurantsByRegion": "88.40",
+    "getTopRatedRestaurantsByCuisine": "89.48",
+    "getTopRatedRestaurantsByRegionAndCuisine": "90.75",
+    "getTopRatedRestaurantsByCuisineWithMinRating": "90.34"
+  }
+}

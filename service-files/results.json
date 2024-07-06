@@ -1,16 +1,10 @@
 {
-  "withCache": {
-    "getRestaurantByName": "92.63",
-    "getTopRatedRestaurantsByRegion": "89.64",
-    "getTopRatedRestaurantsByCuisine": "89.49",
-    "getTopRatedRestaurantsByRegionAndCuisine": "90.10",
-    "getTopRatedRestaurantsByCuisineWithMinRating": "89.90"
-  },
-  "withoutCache": {
-    "getRestaurantByName": "89.09",
-    "getTopRatedRestaurantsByRegion": "89.33",
-    "getTopRatedRestaurantsByCuisine": "89.61",
-    "getTopRatedRestaurantsByRegionAndCuisine": "89.84",
-    "getTopRatedRestaurantsByCuisineWithMinRating": "89.72"
+  "totalTime": "11.27",
+  "timePerFunction": {
+    "getRestaurantByName": "91.92",
+    "getTopRatedRestaurantsByRegion": "87.95",
+    "getTopRatedRestaurantsByCuisine": "88.58",
+    "getTopRatedRestaurantsByRegionAndCuisine": "89.00",
+    "getTopRatedRestaurantsByCuisineWithMinRating": "89.29"
   }
 }

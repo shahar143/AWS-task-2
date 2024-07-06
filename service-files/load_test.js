@@ -3,7 +3,7 @@ const async = require('async');
 const fs = require('fs');
 const { performance } = require('perf_hooks');
 
-const endPoint = 'Restau-LB8A1-TV8TG2KpNOa6-1104166507.us-east-1.elb.amazonaws.com';
+const endPoint = 'Restau-LB8A1-iNNyPE8h4tkX-155131398.us-east-1.elb.amazonaws.com';
 const port = 80;
 
 const sleep = (ms) => {
@@ -251,6 +251,7 @@ const getTopRatedRestaurantsByRegionAndCuisine = async (region, cuisine, limit =
     const end = performance.now();
     const timeTaken = end - start;
     console.log(`Fetched top-rated restaurants by region (${region}) and cuisine (${cuisine}): Status Code: ${response.statusCode}, Time taken: ${timeTaken.toFixed(2)} ms`);
+
     return timeTaken;
 };
 
@@ -273,36 +274,14 @@ const getTopRatedRestaurantsByCuisineWithMinRating = async (cuisine, minRating, 
     const end = performance.now();
     const timeTaken = end - start;
     console.log(`Fetched top-rated restaurants by cuisine (${cuisine}) with minRating (${minRating}): Status Code: ${response.statusCode}, Time taken: ${timeTaken.toFixed(2)} ms`);
+    
     return timeTaken;
-};
-
-/**
- * Sets the cache usage setting.
- */
-const setCacheUsage = async (useCache) => {
-    const options = {
-        hostname: endPoint,
-        port: port,
-        path: '/cache',
-        method: 'PUT',
-        headers: {
-            'Content-Type': 'application/json'
-        }
-    };
-
-    const response = await makeRequest(options, JSON.stringify({ useCache }));
-    console.log(`Cache usage set to ${useCache}: Status Code: ${response.statusCode}`);
-
-    if (response.statusCode !== 200) {
-        console.error(`Failed to set cache usage to ${useCache}`);
-    }
 };
 
 /**
  * Runs the load test with specified cache usage.
  */
-const runLoadTest = async (useCache) => {
-    await setCacheUsage(useCache);
+const runLoadTest = async () => {
 
     const tasks = [];
     const times = {
@@ -317,11 +296,12 @@ const runLoadTest = async (useCache) => {
     const regions = ['North', 'South', 'East', 'West', 'Central'];
     const cuisines = ['Italian', 'Chinese', 'Mexican', 'Indian', 'Thai'];
 
+    const randomRestaurant = restaurantNames[Math.floor(Math.random() * restaurantNames.length)];
+    const randomRegion = regions[Math.floor(Math.random() * regions.length)];
+    const randomCuisine = cuisines[Math.floor(Math.random() * cuisines.length)];
+    const randomMinRating = (Math.random() * 4).toFixed(1);  // Random rating between 0.0 and 4.0
+
     for (let i = 0; i < 100; i++) {
-        const randomRestaurant = restaurantNames[Math.floor(Math.random() * restaurantNames.length)];
-        const randomRegion = regions[Math.floor(Math.random() * regions.length)];
-        const randomCuisine = cuisines[Math.floor(Math.random() * cuisines.length)];
-        const randomMinRating = (Math.random() * 4).toFixed(1);  // Random rating between 0.0 and 4.0
 
         tasks.push(async () => {
             times.getRestaurantByName.push(await getRestaurantByName(randomRestaurant));
@@ -345,30 +325,27 @@ const loadTest = async () => {
     await sleep(5000); // Sleep for 5 seconds to allow cache to update
     await updateRestaurantRatings();
 
-    console.log('Running load test with cache...');
-    const timesWithCache = await runLoadTest(true);
-
-    console.log('Running load test without cache...');
-    const timesWithoutCache = await runLoadTest(false);
+    //measure time with and without cache
+    
+    console.log('Running load test...');
+    console.time('Time of Test'); // *** start measure time
+    const startTime = performance.now();
+    const timesTotal = await runLoadTest();
+    console.timeEnd('Time of Test'); // *** finish measure time
+    const totalTimeOfTest = (performance.now() - startTime) /1000; // *** calculate time
 
     await deleteRestaurants();
 
     const averageTime = (times) => times.reduce((a, b) => a + b, 0) / times.length;
 
     const results = {
-        withCache: {
-            getRestaurantByName: averageTime(timesWithCache.getRestaurantByName).toFixed(2),
-            getTopRatedRestaurantsByRegion: averageTime(timesWithCache.getTopRatedRestaurantsByRegion).toFixed(2),
-            getTopRatedRestaurantsByCuisine: averageTime(timesWithCache.getTopRatedRestaurantsByCuisine).toFixed(2),
-            getTopRatedRestaurantsByRegionAndCuisine: averageTime(timesWithCache.getTopRatedRestaurantsByRegionAndCuisine).toFixed(2),
-            getTopRatedRestaurantsByCuisineWithMinRating: averageTime(timesWithCache.getTopRatedRestaurantsByCuisineWithMinRating).toFixed(2)
-        },
-        withoutCache: {
-            getRestaurantByName: averageTime(timesWithoutCache.getRestaurantByName).toFixed(2),
-            getTopRatedRestaurantsByRegion: averageTime(timesWithoutCache.getTopRatedRestaurantsByRegion).toFixed(2),
-            getTopRatedRestaurantsByCuisine: averageTime(timesWithoutCache.getTopRatedRestaurantsByCuisine).toFixed(2),
-            getTopRatedRestaurantsByRegionAndCuisine: averageTime(timesWithoutCache.getTopRatedRestaurantsByRegionAndCuisine).toFixed(2),
-            getTopRatedRestaurantsByCuisineWithMinRating: averageTime(timesWithoutCache.getTopRatedRestaurantsByCuisineWithMinRating).toFixed(2)
+        totalTime: totalTimeOfTest.toFixed(2),
+        timePerFunction: {
+            getRestaurantByName: averageTime(timesTotal.getRestaurantByName).toFixed(2),
+            getTopRatedRestaurantsByRegion: averageTime(timesTotal.getTopRatedRestaurantsByRegion).toFixed(2),
+            getTopRatedRestaurantsByCuisine: averageTime(timesTotal.getTopRatedRestaurantsByCuisine).toFixed(2),
+            getTopRatedRestaurantsByRegionAndCuisine: averageTime(timesTotal.getTopRatedRestaurantsByRegionAndCuisine).toFixed(2),
+            getTopRatedRestaurantsByCuisineWithMinRating: averageTime(timesTotal.getTopRatedRestaurantsByCuisineWithMinRating).toFixed(2)
         }
     };
 
