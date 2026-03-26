@@ -10,7 +10,7 @@
   "license": "ISC",
   "description": "",
   "dependencies": {
-    "@aws-sdk/client-dynamodb": "^3.596.0",
+    "@aws-sdk/client-dynamodb": "^3.1017.0",
     "async": "^3.2.5",
     "aws-sdk": "^2.1645.0",
     "axios": "^1.7.2",
